@@ -1,0 +1,4 @@
+design/PSD/*.psd 
+design/AI/*.ai 
+*.log 
+.env 
