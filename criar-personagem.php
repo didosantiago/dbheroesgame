@@ -6,7 +6,7 @@
             if(!$personagem->nomeGuerreiroExists($nomeGuerreiro)){
                 $dados = $personagem->getInfoPersonagem(addslashes($_POST['idPersonagem']));
                 
-                $select_foto = $core->getDados('personagens_fotos', "WHERE idPersonagem=".addslashes($_POST['idPersonagem'])." AND capa = 1");
+                $select_foto = $core->getDados('personagens', "WHERE id=".addslashes($_POST['idPersonagem']));
 
                 $campos = array(
                     'idPersonagem' => addslashes($_POST['idPersonagem']),
@@ -16,19 +16,17 @@
                     'nome' => $nomeGuerreiro,
                     'foto' => $select_foto->foto,
                     'hp' => 150,
-                    'mana' => $dados->mana,
-                    'energia' => $dados->energia,
                     'gold' => 1000
                 );
 
                 if($core->filtrarPalavrasOfensivas($nomeGuerreiro)){
                     if($core->insert('usuarios_personagens', $campos)){
-                        $sql = "SELECT * FROM usuarios_personagens WHERE idUsuario = $user->id ORDER BY id DESC limit 1";
+                        $sql = "SELECT * FROM usuarios_personagens WHERE idUsuario = {$user->id} ORDER BY id DESC limit 1";
                         $stmt = DB::prepare($sql);
                         $stmt->execute();
                         $item = $stmt->fetch();
 
-                        $sql = "SELECT * FROM personagens WHERE id = $item->idPersonagem";
+                        $sql = "SELECT * FROM personagens WHERE id = {$item->idPersonagem}";
                         $stmt = DB::prepare($sql);
                         $stmt->execute();
                         $personagem_principal = $stmt->fetch();
