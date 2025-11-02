@@ -89,15 +89,26 @@ class Personagens {
         
         echo $row;
     }
-    
-    public function getMeusPersonagens($idUsuario){        
+     
+   
+    public function getMeusPersonagens($idUsuario){
+         
+        // Check if user ID is valid
+        if($idUsuario == null || $idUsuario == '' || $idUsuario == 0){
+            echo '<div class="no-characters">
+                    <p>Você ainda não criou nenhum guerreiro.</p>
+                    <a href="'.BASE.'criar-personagem" class="bts-form">Criar Primeiro Guerreiro</a>
+                </div>';
+            return;
+        }
+        
         $sql = "SELECT up.id, up.nome, up.foto, p.raca  "
-             . "FROM usuarios_personagens as up "
-             . "INNER JOIN personagens as p ON p.id = up.idPersonagem "
-             . "WHERE up.idUsuario = $idUsuario";
+            . "FROM usuarios_personagens as up "
+            . "INNER JOIN personagens as p ON p.id = up.idPersonagem "
+            . "WHERE up.idUsuario = ?";
         
         $stmt = DB::prepare($sql);
-        $stmt->execute();
+        $stmt->execute([$idUsuario]);
         $item = $stmt->fetchAll();
         
         $row = '';
@@ -492,29 +503,41 @@ class Personagens {
         
         $tempo_atual = time();
         $tempo_final = time() + $segundos;
-        
+
         $campos = array(
             'idPersonagem' => $idPersonagem,
             'idPlaneta' => $idPlaneta,
             'idUsuario' => $idUsuario,
-            'tempo' => $tempo_atual,
+            'tempo_inicial' => $tempo_atual,
             'tempo_final' => $tempo_final,
             'gold' => $vl_gold,
             'tempo' => $tempo,
-            'data' => date('Y-m-d'),
-            'exp' => $qtd_exp
+            'data' => date('Y-m-d'),  // ✅ THIS LINE
+            'exp' => $qtd_exp,
+            'concluida' => 0,
+            'cancelada' => 0
         );
         
         $core->insert('cacadas', $campos);
-        
+
         $sql = "SELECT * FROM cacadas WHERE idUsuario = '$idUsuario' ORDER BY id DESC LIMIT 1";
         $stmt = DB::prepare($sql);
         $stmt->execute();
         $dados_cacada = $stmt->fetch();
-        
+
+        // Set session variables
         $_SESSION['cacada'] = true;
-        $_SESSION['cacada_id'] = $dados_cacada->id;        
+        $_SESSION['cacada_id'] = $dados_cacada->id;
+
+        // Force session write before redirect
+        session_write_close();
+
+        // Reopen session for next request
+        session_start();
+
+        // Redirect
         header('Location: '.BASE.'portal');
+        exit;
     }
     
     public function somaCacada($idUsuario, $idCacada){
@@ -569,78 +592,109 @@ class Personagens {
         }
     }
     
-    public function cacadaEsgotada($idPersonagem, $time, $vip){
-        $core = new Core();
-        
-        $sql = "SELECT * FROM cacadas WHERE idPersonagem = $idPersonagem AND concluida = 1 AND cancelada = 0 AND data = CURRENT_DATE()";
-        $stmt = DB::prepare($sql);
-        $stmt->execute();
-        $cacada = $stmt->fetchAll();
-        
-        if($vip == 1){
-            $tempo = $time / 2;
-        } else {
-            $tempo = $time;
-        }
-        
-        foreach ($cacada as $key => $value) {
-            $tempo += intval($value->tempo);
-        }
-        
-        if($vip == 1){
-            $tempo = $tempo / 2;
-        }
-        
-        if($vip == 1){
-            $qtd = 120;
-        } else {
-            $qtd = 60;
-        }
-        
-        $config = $core->getConfiguracoes();
-        
-        if($config->teste == 1){
-            return false;
-        } else {
-            if($tempo >= $qtd){
-                return true;
-            } else {
-                return false;
-            }
-        }
+    public function cacadaEsgotada($idPersonagem, $tempo, $vip){
+    $core = new Core();
+    
+    // Define daily limits
+    if($vip == 1){
+        $limite_diario = 120; // 2 hours for VIP
+    } else {
+        $limite_diario = 60; // 1 hour for non-VIP
     }
+    
+    // Get total hunt time used TODAY for THIS specific character
+    $sql = "SELECT SUM(tempo) as total_usado 
+            FROM cacadas 
+            WHERE idPersonagem = $idPersonagem 
+            AND data = CURDATE() 
+            AND cancelada = 0";
+    $stmt = DB::prepare($sql);
+    $stmt->execute();
+    $resultado = $stmt->fetch();
+    
+    $tempo_usado = $resultado->total_usado ? intval($resultado->total_usado) : 0;
+    $tempo_solicitado = intval($tempo);
+    
+    // Check if requested time + used time exceeds daily limit
+    if(($tempo_usado + $tempo_solicitado) > $limite_diario){
+        return true; // Exhausted
+    }
+    
+    return false; // OK to hunt
+}
     
     public function cacadasRun($idUsuario, $idPersonagem){
-        $core = new Core();
-        
-        $sql = "SELECT * FROM cacadas WHERE idUsuario = '$idUsuario' AND idPersonagem = $idPersonagem AND concluida = 0 AND cancelada = 0";
-        $stmt = DB::prepare($sql);
-        $stmt->execute();
+    $core = new Core();
+    
+    // Only get active hunts for THIS specific character
+    $sql = "SELECT * FROM cacadas 
+            WHERE idUsuario = '$idUsuario' 
+            AND idPersonagem = $idPersonagem 
+            AND concluida = 0 
+            AND cancelada = 0
+            AND tempo_final > ".time();
+    $stmt = DB::prepare($sql);
+    $stmt->execute();
+    
+    if($stmt->rowCount() > 0){
         $cacada = $stmt->fetch();
         
+        // Set session for active hunt
+        $_SESSION['cacada'] = true;
+        $_SESSION['cacada_id'] = $cacada->id;
+    } else {
+        // No active hunt for this character, clear session
+        if(isset($_SESSION['cacada'])){
+            unset($_SESSION['cacada']);
+        }
+        if(isset($_SESSION['cacada_id'])){
+            unset($_SESSION['cacada_id']);
+        }
+    }
+}
+
+    public function missoesRun($idUsuario, $idPersonagem){
+        $core = new Core();
+        
+        $sql = "SELECT * FROM personagens_missoes WHERE idUsuario = '$idUsuario' AND idPersonagem = $idPersonagem AND concluida = 0 AND cancelada = 0";
+        $stmt = DB::prepare($sql);
+        $stmt->execute();
+        $missao = $stmt->fetch();
+        
         if($stmt->rowCount() > 0){
-            $_SESSION['cacada'] = true;
-            $_SESSION['cacada_id'] = $cacada->id;  
+            $_SESSION['missao'] = true;
+            $_SESSION['missao_id'] = $missao->id;  
         }
     }
     
-    public function cacadaExecuting($idUsuario, $idPersonagem){
+    public function pvpRun($idUsuario, $idPersonagem){
         $core = new Core();
         
-        $sql = "SELECT * FROM cacadas WHERE idUsuario = '$idUsuario' AND idPersonagem = $idPersonagem AND concluida = 0";
+        $sql = "SELECT * FROM pvp WHERE idPersonagem = $idPersonagem AND concluido = 0";
         $stmt = DB::prepare($sql);
         $stmt->execute();
-        $dados_cacada = $stmt->fetch();
         
         if($stmt->rowCount() > 0){
-            $_SESSION['cacada'] = true;
-            $_SESSION['cacada_id'] = $dados_cacada->id;  
-            
-            return true;
-        } else {
-            return false;
+            $pvp = $stmt->fetch();
+            $_SESSION['pvp'] = true;
+            $_SESSION['pvp_id'] = $pvp->id;  
         }
     }
+    
+    public function npcRun($idUsuario, $idPersonagem){
+        $core = new Core();
+        
+        $sql = "SELECT * FROM npc_batalhas WHERE idPersonagem = $idPersonagem AND concluida = 0 AND cancelada = 0";
+        $stmt = DB::prepare($sql);
+        $stmt->execute();
+        
+        if($stmt->rowCount() > 0){
+            $npc = $stmt->fetch();
+            $_SESSION['npc'] = true;
+            $_SESSION['npc_id'] = $npc->id;  
+        }
+    }
+    
     
     public function verificaCacadaCancelada($idCacada){
         $core = new Core();
@@ -738,7 +792,8 @@ class Personagens {
         return intval($item->exp);
     }
     
-    public function getGraduacao($nivel, $new_lv = 0){        
+    public function getGraduacao($nivel, $new_lv = 0){   
+             
         $sql = "SELECT * FROM graduacoes";
         $stmt = DB::prepare($sql);
         $stmt->execute();
@@ -1052,6 +1107,7 @@ class Personagens {
     
     public function getRanking($tipo, $planeta, $pc, $qtd_resultados){
         $user = new Usuarios();
+        $user->getUserInfo($_SESSION['username']); // CORRECT
         $core = new Core();
 
         //Paginando os Resultados
@@ -1774,32 +1830,83 @@ class Personagens {
     }
     
     public function getCacadaRunning($idPersonagem, $idCacada){
-        $core = new Core();
+    $core = new Core();
+    
+    // Get hunt details
+    $sql = "SELECT * FROM cacadas 
+            WHERE id = $idCacada 
+            AND idPersonagem = $idPersonagem
+            AND concluida = 0 
+            AND cancelada = 0";
+    $stmt = DB::prepare($sql);
+    $stmt->execute();
+    
+    if($stmt->rowCount() > 0){
+        $cacada = $stmt->fetch();
+        $tempo_restante = $cacada->tempo_final - time();
         
-        $sql = "SELECT * FROM cacadas WHERE idPersonagem = $idPersonagem AND id = $idCacada";
-        $stmt = DB::prepare($sql);
-        $stmt->execute();
-        $item = $stmt->fetch();
-        
-        $row = '';
-        
-        if($stmt->rowCount() > 0){
-            if($item->tempo_final > time()){
-                $row .= '<div class="cacada-running">
-                            <span>Você está em uma caçada, aguarde o tempo terminar para iniciar missões, arena e caçadas.</span>
-                            <a class="bts-form" id="cancelarCacada">Cancelar Caçada</a>
-                            <input type="hidden" name="idCacada" id="idCacada" value="'.$idCacada.'" />
-                            <div class="contador"></div>
-                        </div>';
-            } else {
-                $row .= '<div class="cacada-running">
-                            <span>Caçada Concluída, clique no botão para receber seu prêmio</span><form method="post"><input type="submit" name="confirmar_cacada" value="Concluir" /></form>
-                         </div>';
-            }
+        if($tempo_restante > 0){
+            // Hunt still running - show notification
+            $row = '<div class="cacada-running">
+                        <span>Você está em uma caçada, aguarde o tempo terminar para iniciar missões, arena e caçadas.</span>
+                        <a class="bts-form" id="cancelarCacada">Cancelar Caçada</a>
+                        <input type="hidden" name="idCacada" id="idCacada" value="'.$idCacada.'" />
+                        <div class="contador"></div>
+                     </div>';
+            return $row;
+        } else {
+            // Hunt expired while user was away!
+            // Complete it now
+            
+            // Mark as completed
+            $campos_cacada = array('concluida' => 1);
+            $where_cacada = 'id = ' . $cacada->id;
+            $core->update('cacadas', $campos_cacada, $where_cacada);
+            
+            // Get character data
+            $sql_char = "SELECT * FROM usuarios_personagens WHERE id = " . $cacada->idPersonagem;
+            $stmt_char = DB::prepare($sql_char);
+            $stmt_char->execute();
+            $char_data = $stmt_char->fetch();
+            
+            // Calculate rewards
+            $gold_ganho = intval($cacada->gold);
+            $exp_ganho = intval($cacada->exp);
+            
+            // Update character gold and exp
+            $novo_gold = intval($char_data->gold) + $gold_ganho;
+            $novo_exp = intval($char_data->exp) + $exp_ganho;
+            
+            $campos_personagem = array(
+                'gold' => $novo_gold,
+                'exp' => $novo_exp
+            );
+            $where_personagem = 'id = ' . $cacada->idPersonagem;
+            $core->update('usuarios_personagens', $campos_personagem, $where_personagem);
+            
+            // Insert rewards notification
+            $campos_valor = array(
+                'idPersonagem' => $cacada->idPersonagem,
+                'gold' => $gold_ganho,
+                'exp' => $exp_ganho,
+                'visualizado' => 0
+            );
+            $core->insert('personagens_new_valores', $campos_valor);
+            
+            // Check for level up
+            $this->checkLevelUp($cacada->idPersonagem);
+            
+            // Clear session
+            unset($_SESSION['cacada']);
+            unset($_SESSION['cacada_id']);
+            
+            // Return empty (will show rewards popup on page reload)
+            return '';
         }
-        
-        echo $row;
     }
+    
+    return '';
+}
     
     public function getMissaoRunning($idPersonagem, $idMissao){
         $core = new Core();
@@ -1828,4 +1935,59 @@ class Personagens {
         
         echo $row;
     }
+
+                /**
+     * Check if character should level up based on current EXP
+     * @param int $idPersonagem Character ID
+     */
+    public function checkLevelUp($idPersonagem){
+        $core = new Core();
+        
+        // Get character current data
+        $sql = "SELECT * FROM usuarios_personagens WHERE id = $idPersonagem";
+        $stmt = DB::prepare($sql);
+        $stmt->execute();
+        
+        if($stmt->rowCount() > 0){
+            $char = $stmt->fetch();
+            
+            // Get required EXP for next level
+            $sql_level = "SELECT * FROM level WHERE level = " . ($char->nivel + 1);
+            $stmt_level = DB::prepare($sql_level);
+            $stmt_level->execute();
+            
+            if($stmt_level->rowCount() > 0){
+                $next_level = $stmt_level->fetch();
+                
+                // Check if character has enough EXP to level up
+                if($char->exp >= $next_level->exp){
+                    // Level up!
+                    $novo_nivel = $char->nivel + 1;
+                    
+                    // Update character level and reset EXP
+                    $campos = array(
+                        'nivel' => $novo_nivel,
+                        'hp' => intval($char->hp) + 50,
+                        'mana' => intval($char->mana) + 50,
+                        'forca' => intval($char->forca) + 1,
+                        'agilidade' => intval($char->agilidade) + 1,
+                        'habilidade' => intval($char->habilidade) + 1,
+                        'resistencia' => intval($char->resistencia) + 1,
+                        'sorte' => intval($char->sorte) + 1
+                    );
+                    $where = 'id = ' . $idPersonagem;
+                    $core->update('usuarios_personagens', $campos, $where);
+                    
+                    // Set session flag for level up notification
+                    $_SESSION['novo_nivel'] = true;
+                    $_SESSION['nivel_atual'] = $novo_nivel;
+                    
+                    return true;
+                }
+            }
+        }
+        
+        return false;
+    }
 }
+
