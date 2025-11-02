@@ -284,6 +284,7 @@ DBH.common = {
         init: init
     }
 }());;DBH.header = (function() {
+    var reload = 0;  // <- ensure reload is declared
     var init = function() {
         mascaras();
         menu();
@@ -328,7 +329,7 @@ DBH.common = {
                       { name: 'paragraph', items : [ 'JustifyLeft','JustifyCenter','JustifyRight','JustifyBlock'] },
                       { name: 'styles', items : [ 'Font','FontSize' ] },
                       { name: 'colors', items : [ 'TextColor','BGColor' ] },
-                      { name: 'clipboard', items : [ 'Cut','Copy','Paste','PasteFromWord','-','Undo','Redo' ] },                             
+                      { name: 'clipboard', items : [ 'Cut','Copy','Paste','PasteFromWord','-','Undo','Redo' ] },
                       { name: 'tools', items : [ 'Maximize','-','About' ] },
                       { name: 'links', items : [ 'Link','Unlink','Anchor' ] },
                       { name: 'insert', items : [ 'Image','Flash','Table','HorizontalRule','Smiley','SpecialChar','PageBreak','Iframe' ] }
@@ -521,7 +522,7 @@ DBH.common = {
 
             // Cria a variável para formatar no estilo hora/cronômetro
             horaImprimivel = horas + ':' + min + ':' + seg;
-            //JQuery pra setar o valor
+            //JQuery pra setar the value
             
             $(".pvp-running .contador").html(horaImprimivel);
             $(".pvp-running").show();
@@ -566,7 +567,7 @@ DBH.common = {
             min = min % 60;
             var seg = tempo%60;
 
-            // Formata o número menor que dez, ex: 08, 07, ...
+            // Formata the values
             if(min < 10){
                 min = "0"+min;
                 min = min.substr(0, 2);
@@ -580,20 +581,14 @@ DBH.common = {
                 horas = "0"+horas;
             }
 
-            // Cria a variável para formatar no estilo hora/cronômetro
             horaImprimivel = horas + ':' + min + ':' + seg;
-            //JQuery pra setar o valor
-            
             $(".punicao-adversario .contador").html(horaImprimivel);
             $(".punicao-adversario").show();
 
-            // Define que a função será executada novamente em 1000ms = 1 segundo
             setTimeout(function(){ 
                 startCountdownPunicao(tempo);
             }, 1000);
-            
 
-            // diminui o tempo
             tempo --;
         } else {
             $(".punicao-adversario").remove();
@@ -985,7 +980,11 @@ DBH.common = {
         var data_string = 'id=' + id;
         var baseSite = $('#baseSite').val();
         
-        $('html, body').animate({scrollTop: $('.batalha').offset().top}, 'slow');
+        // guard - only scroll if element exists
+        var alvo = $('.batalha');
+        if (alvo.length) {
+            $('html, body').animate({scrollTop: alvo.offset().top}, 'slow');
+        }
 
         $.ajax({
             type: "POST",
@@ -1005,7 +1004,6 @@ DBH.common = {
             min = min % 60;
             var seg = tempo%60;
 
-            // Formata o número menor que dez, ex: 08, 07, ...
             if(min < 10){
                 min = "0"+min;
                 min = min.substr(0, 2);
@@ -1019,10 +1017,8 @@ DBH.common = {
                 horas = "0"+horas;
             }
 
-            // Cria a variável para formatar no estilo hora/cronômetro
             horaImprimivel = min + ':' + seg;
-            //JQuery pra setar o valor
-            
+
             if($('.npc-vitoria').length > 0 || $('.npc-derrota').length > 0){
                 $(".contador-batalha .cronometro").html('00:00');
             } else {
@@ -1031,13 +1027,10 @@ DBH.common = {
             
             $(".contador-batalha").show();
 
-            // Define que a função será executada novamente em 1000ms = 1 segundo
             setTimeout(function(){ 
                 startCountdownNPC(tempo);
             }, 1000);
-            
 
-            // diminui o tempo
             tempo --;
         } else {
             $(".contador-batalha .cronometro").html('00:00');
@@ -1069,7 +1062,6 @@ DBH.common = {
         });
     },
     startCountdownBatalha = function(tempo){
-        // Se o tempo não for zerado
         if((tempo - 1) >= 0){
             
             var min = parseInt(tempo/60);
@@ -1077,7 +1069,6 @@ DBH.common = {
             min = min % 60;
             var seg = tempo%60;
 
-            // Formata o número menor que dez, ex: 08, 07, ...
             if(min < 10){
                 min = "0"+min;
                 min = min.substr(0, 2);
@@ -1091,20 +1082,14 @@ DBH.common = {
                 horas = "0"+horas;
             }
 
-            // Cria a variável para formatar no estilo hora/cronômetro
             horaImprimivel = horas + ':' + min + ':' + seg;
-            //JQuery pra setar o valor
-            
             $(".npc-running .contador").html(horaImprimivel);
             $(".npc-running").show();
 
-            // Define que a função será executada novamente em 1000ms = 1 segundo
             setTimeout(function(){ 
                 startCountdownBatalha(tempo);
             }, 1000);
-            
 
-            // diminui o tempo
             tempo --;
         } else {
             $(".npc-running").remove();
@@ -1129,11 +1114,21 @@ DBH.common = {
         });
     },
     combateLog = function(){
+        // Initialize PerfectScrollbar safely (avoid redeclaring the same identifier)
         const container = document.querySelector('.log');
-        const ps = new PerfectScrollbar(container);
-
-        // or just with selector string
-        const ps = new PerfectScrollbar('.log');
+        if (container) {
+            try {
+                new PerfectScrollbar(container);
+            } catch (e) {
+                console.warn('PerfectScrollbar init failed for element .log:', e);
+            }
+        } else {
+            try {
+                new PerfectScrollbar('.log');
+            } catch (e) {
+                console.warn('PerfectScrollbar selector init failed:', e);
+            }
+        }
     }
     
     return {
@@ -1204,7 +1199,10 @@ DBH.common = {
             $(this).toggleClass('active');
             var foto = $(this).attr('dataFoto');
             $('#fotoPersonagem').val(foto);
-            $('html, body').animate({scrollTop: $('.btn-step-1').offset().top}, 'slow');
+            var alvo = $('.btn-step-1');
+            if (alvo.length) {
+                $('html, body').animate({scrollTop: alvo.offset().top}, 'slow');
+            }
         });
         
         $('.btn-step-1').on('click', function(){
@@ -1231,7 +1229,8 @@ DBH.common = {
             if($('#nomeGuerreiro').val() != ''){
                 $('.item-planetas').removeClass('active');
                 $(this).toggleClass('active');
-                $('html, body').animate({scrollTop: $('.btn-step-2').offset().top}, 'slow');
+                var alvo = $('.btn-step-2');
+                if (alvo.length) $('html, body').animate({scrollTop: alvo.offset().top}, 'slow');
             } else {
                 $('.conteudo #wizard-personagem ul').after('<div class="valida">Digite um nome para o seu guerreiro antes de avançar para a próxima etapa.</div>');
                 $('#nomeGuerreiro').focus();
@@ -1342,12 +1341,17 @@ DBH.common = {
         $('.item-personagem').on('click', function(){
             $('.item-personagem').removeClass('active');
             $(this).toggleClass('active');
-            $('html, body').animate({scrollTop: $('.btn-confirmar').offset().top}, 'slow');
+            var alvo = $('.btn-confirmar');
+            if (alvo.length) $('html, body').animate({scrollTop: alvo.offset().top}, 'slow');
         });
     },
     meuPersonagem = function(){
-        $('html, body').animate({scrollTop: $('.lista-meus-personagens').offset().top}, 'slow');
-        
+        // Only scroll if the element exists (fixes "Cannot read properties of undefined (reading 'top')")
+        var lista = $('.lista-meus-personagens');
+        if (lista.length) {
+            $('html, body').animate({scrollTop: lista.offset().top}, 'slow');
+        }
+
         $('label.meu-personagem').on('click', function(){
             $('label.meu-personagem').removeClass('active-gray');
             $(this).toggleClass('active-gray');
@@ -1360,16 +1364,69 @@ DBH.common = {
                 url: baseSite+"ajax/ajaxPersonagens.php",
                 data: data_string,
                 cache: true,
-                async: true, // NO LONGER ALLOWED TO BE FALSE BY BROWSER
+                async: true,
+                // --- Replace the existing image fallback block inside the ajax success handler with this code ---
                 success: function (res) {
-                    console.log(res);
+                    // defensive handling: if server returned empty or error-like response, show friendly message
+                    if (!res || (typeof res === 'string' && res.trim().length === 0)) {
+                        console.warn('ajaxPersonagens returned empty response for id:', id);
+                        $(".personagem-atual").html('<div class="msg-error">Erro ao carregar personagem. Tente novamente.</div>');
+                        return;
+                    }
+
+                    // if response contains server error / forbidden notice, show message
+                    var low = (res+"").toLowerCase();
+                    if (low.indexOf('forbidden') !== -1 || low.indexOf('notice') !== -1 || low.indexOf('warning') !== -1 || low.indexOf('error') !== -1 && low.indexOf('<html') !== -1) {
+                        console.warn('Server-side error in ajaxPersonagens response:', res);
+                        $(".personagem-atual").html('<div class="msg-error">Erro do servidor ao carregar personagem. Verifique logs.</div>');
+                        return;
+                    }
+
+                    // insert HTML
                     $(".personagem-atual").html(res);
 
-                    if(detectar_mobile() == true){
-                        $('html, body').animate({scrollTop: $('.personagem-atual > .info').offset().top}, 'slow');
+                    // determine base path saved in #baseSite (fallback to empty)
+                    var baseSitePath = $('#baseSite').val() || '';
+                    // ensure trailing slash (so concatenation is safe)
+                    if (baseSitePath && baseSitePath.slice(-1) !== '/') baseSitePath += '/';
+                    var defaultCard = baseSitePath + 'assets/cards/default.png';
+
+                    // Make image src fallbacks: if any image src looks like '/assets/cards/' (no filename) or failed to load, replace with default placeholder
+                    $(".personagem-atual img").each(function() {
+                        try {
+                            var $img = $(this);
+                            var src = $img.attr('src') || '';
+                            // If src ends with '/assets/cards/' or missing filename, set placeholder using baseSite
+                            if (src.match(/\/assets\/cards\/?$/i) || src.trim() === '') {
+                                $img.attr('src', defaultCard);
+                            }
+                            // Add onerror fallback to handle 403/404 — set to baseSite-aware placeholder
+                            $img.on('error', function(){
+                                // avoid infinite loop if default is missing: only replace if current src isn't already the default
+                                try {
+                                    if ($img.attr('src') !== defaultCard) {
+                                        $img.attr('src', defaultCard);
+                                    }
+                                } catch(e) { /* noop */ }
+                            });
+                        } catch(e) {
+                            console.warn('Error handling personagem image fallback', e);
+                        }
+                    });
+
+                    // Scroll to inserted content, prefer .personagem-atual > .info if present
+                    var info = $('.personagem-atual > .info');
+                    if (info.length) {
+                        $('html, body').animate({scrollTop: info.offset().top}, 'slow');
                     } else {
-                        $('html, body').animate({scrollTop: $('.conteudo').offset().top}, 'slow');
+                        var conteudo = $('.conteudo');
+                        if (conteudo.length) $('html, body').animate({scrollTop: conteudo.offset().top}, 'slow');
                     }
+                },
+                // ---
+                error: function(jqXHR, textStatus, errorThrown) {
+                    console.error('ajaxPersonagens error', textStatus, errorThrown, jqXHR.responseText);
+                    $(".personagem-atual").html('<div class="msg-error">Erro de rede ao carregar personagem. ('+jqXHR.status+')</div>');
                 }
             });
         });
@@ -1492,7 +1549,8 @@ DBH.common = {
         var data_string = 'id=' + id;
         
         if($('body').hasClass('combate')){
-            $('html, body').animate({scrollTop: $('.batalha').offset().top}, 'slow');
+            var alvo = $('.batalha');
+            if (alvo.length) $('html, body').animate({scrollTop: alvo.offset().top}, 'slow');
             var url = "../ajax/ajaxPVP.php";
         } else {
             var url = "ajax/ajaxPVP.php"; 
@@ -1508,7 +1566,6 @@ DBH.common = {
         });
     },
     startCountdownPVP = function(tempo){
-        // Se o tempo não for zerado
         if((tempo - 1) >= 0){
             
             var min = parseInt(tempo/60);
@@ -1516,7 +1573,6 @@ DBH.common = {
             min = min % 60;
             var seg = tempo%60;
 
-            // Formata o número menor que dez, ex: 08, 07, ...
             if(min < 10){
                 min = "0"+min;
                 min = min.substr(0, 2);
@@ -1530,9 +1586,7 @@ DBH.common = {
                 horas = "0"+horas;
             }
 
-            // Cria a variável para formatar no estilo hora/cronômetro
             horaImprimivel = min + ':' + seg;
-            //JQuery pra setar o valor
             
             if($('.pvp-vitoria').length > 0 || $('.pvp-derrota').length > 0){
                 $(".contador-batalha .cronometro").html('00:00');
@@ -1542,21 +1596,15 @@ DBH.common = {
             
             $(".contador-batalha").show();
 
-            // Define que a função será executada novamente em 1000ms = 1 segundo
             setTimeout(function(){ 
                 startCountdownPVP(tempo);
             }, 1000);
-            
 
-            // diminui o tempo
             tempo --;
         } else {
             $(".contador-batalha .cronometro").html('00:00');
             var finalizado = $('#finalizado').val();
             var round = $('#round').val();
-            
-            console.log(finalizado);
-            console.log(round);
 
             if(round == 0){
                 if(finalizado == 0){
@@ -1588,11 +1636,21 @@ DBH.common = {
         });
     },
     combateLog = function(){
+        // Initialize PerfectScrollbar safely (avoid redeclaring the same identifier)
         const container = document.querySelector('.log');
-        const ps = new PerfectScrollbar(container);
-
-        // or just with selector string
-        const ps = new PerfectScrollbar('.log');
+        if (container) {
+            try {
+                new PerfectScrollbar(container);
+            } catch (e) {
+                console.warn('PerfectScrollbar init failed for element .log:', e);
+            }
+        } else {
+            try {
+                new PerfectScrollbar('.log');
+            } catch (e) {
+                console.warn('PerfectScrollbar selector init failed:', e);
+            }
+        }
     }
     
     return {
